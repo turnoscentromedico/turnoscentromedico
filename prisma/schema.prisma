@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  STANDARD
+}
+
+model User {
+  id          Int              @id @default(autoincrement())
+  clerkUserId String           @unique
+  name        String
+  email       String           @unique
+  role        UserRole         @default(STANDARD)
+  clinics     Clinic[]         @relation("UserClinics")
+  active      Boolean          @default(true)
+  preferences UserPreference?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("users")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model Clinic {
+  id            Int                     @id @default(autoincrement())
+  name          String
+  address       String?
+  phone         String?
+  doctors       Doctor[]
+  appointments  Appointment[]
+  users         User[]                  @relation("UserClinics")
+  notifications InternalNotification[]
+
+  @@map("clinics")
+}
+
+model Specialty {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique
+  description  String?
+  doctors      Doctor[]
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("specialties")
+}
+
+model Doctor {
+  id               Int                    @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  dni              String                 @unique
+  nationality      String?
+  dateOfBirth      DateTime?
+  phone            String?
+  address          String?
+  licenseNumber    String                 @unique
+  specialtyId      Int
+  clinicId         Int
+  specialty        Specialty              @relation(fields: [specialtyId], references: [id])
+  clinic           Clinic                 @relation(fields: [clinicId], references: [id])
+  schedule         DoctorSchedule[]
+  unavailabilities DoctorUnavailability[]
+  appointments     Appointment[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@map("doctors")
+}
+
+model Patient {
+  id           Int           @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  dni          String        @unique
+  nationality  String
+  dateOfBirth  DateTime
+  email        String?
+  phone        String?
+  address      String?
+  cuilCuit     String?
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("patients")
+}
+
+model DoctorSchedule {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  doctor          Doctor   @relation(fields: [doctorId], references: [id])
+  dayOfWeek       Int
+  startTime       String
+  endTime         String
+  slotDuration    Int      @default(30)
+  lunchBreakStart String?
+  lunchBreakEnd   String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([doctorId, dayOfWeek])
+  @@map("doctor_schedules")
+}
+
+model DoctorUnavailability {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  date      DateTime
+  startTime String?
+  endTime   String?
+  reason    String?
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("doctor_unavailabilities")
+}
+
+model Appointment {
+  id          Int               @id @default(autoincrement())
+  patientId   Int
+  doctorId    Int
+  specialtyId Int
+  clinicId    Int
+  date        DateTime
+  startTime   String?
+  endTime     String?
+  status      AppointmentStatus @default(PENDING)
+  notes       String?
+
+  patient      Patient                @relation(fields: [patientId], references: [id])
+  doctor       Doctor                 @relation(fields: [doctorId], references: [id])
+  specialty    Specialty              @relation(fields: [specialtyId], references: [id])
+  clinic       Clinic                 @relation(fields: [clinicId], references: [id])
+  actionTokens AppointmentActionToken[]
+
+  @@unique([doctorId, date, startTime])
+  @@map("appointments")
+}
+
+model AppointmentActionToken {
+  id            Int         @id @default(autoincrement())
+  token         String      @unique
+  appointmentId Int
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  action        String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@map("appointment_action_tokens")
+}
+
+model InternalNotification {
+  id        Int      @id @default(autoincrement())
+  type      String
+  title     String
+  message   String
+  metadata  Json?
+  read      Boolean  @default(false)
+  clinicId  Int?
+  clinic    Clinic?  @relation(fields: [clinicId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("internal_notifications")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model UserPreference {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
+}

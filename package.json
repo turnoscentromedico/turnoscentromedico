@@ -1,0 +1,51 @@
+{
+  "name": "svc-appointments",
+  "version": "1.0.0",
+  "description": "Backend para sistema de turnos de clínica médica",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "dotenv -e .env.test -- vitest run",
+    "test:watch": "dotenv -e .env.test -- vitest",
+    "test:ui": "dotenv -e .env.test -- vitest --ui"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "keywords": [],
+  "license": "MIT",
+  "dependencies": {
+    "@bull-board/api": "^6.0.0",
+    "@bull-board/fastify": "^6.0.0",
+    "@clerk/backend": "^3.2.2",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/sensible": "^6.0.0",
+    "@prisma/client": "^6.5.0",
+    "bullmq": "^5.0.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.2.0",
+    "fastify-plugin": "^5.0.0",
+    "fastify-type-provider-zod": "^4.0.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "resend": "^4.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@vitest/ui": "^3.0.0",
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
