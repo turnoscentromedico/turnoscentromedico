@@ -106,7 +106,7 @@ model Patient {
 model DoctorSchedule {
   id              Int      @id @default(autoincrement())
   doctorId        Int
-  doctor          Doctor   @relation(fields: [doctorId], references: [id])
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   dayOfWeek       Int
   startTime       String
   endTime         String
@@ -147,7 +147,7 @@ model Appointment {
   notes       String?
 
   patient      Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor       Doctor                 @relation(fields: [doctorId], references: [id])
+  doctor       Doctor                 @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   specialty    Specialty              @relation(fields: [specialtyId], references: [id])
   clinic       Clinic                 @relation(fields: [clinicId], references: [id])
   actionTokens  AppointmentActionToken[]
