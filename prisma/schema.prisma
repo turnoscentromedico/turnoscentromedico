@@ -146,7 +146,7 @@ model Appointment {
   status      AppointmentStatus @default(PENDING)
   notes       String?
 
-  patient      Patient                @relation(fields: [patientId], references: [id])
+  patient      Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor       Doctor                 @relation(fields: [doctorId], references: [id])
   specialty    Specialty              @relation(fields: [specialtyId], references: [id])
   clinic       Clinic                 @relation(fields: [clinicId], references: [id])
