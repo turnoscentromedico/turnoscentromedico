@@ -38,6 +38,7 @@ import {
 import { appointmentActionRoutes } from "./modules/appointment/appointment-action.routes";
 import { notificationRoutes } from "./modules/notification/notification.routes";
 import { userPreferenceRoutes } from "./modules/user-preference/user-preference.routes";
+import { medicalRecordRoutes } from "./modules/medical-record/medical-record.routes";
 
 export async function buildApp() {
   const app = Fastify({
@@ -143,6 +144,7 @@ export async function buildApp() {
       await opScope.register(scheduleRoutes, { prefix: "/api/schedules" });
       await opScope.register(unavailabilityRoutes, { prefix: "/api/unavailabilities" });
       await opScope.register(notificationRoutes, { prefix: "/api/notifications" });
+      await opScope.register(medicalRecordRoutes, { prefix: "/api" });
 
       // GET /api/dashboard/stats
       opScope.get("/api/dashboard/stats", async () => {

@@ -29,6 +29,7 @@ const SORTABLE_FIELDS = [
   "patient.lastName", "doctor.lastName", "clinic.name", "specialty.name",
 ];
 import { ActionTokenService } from "../../services/action-token.service";
+import { MedicalRecordService } from "../medical-record/medical-record.service";
 import type {
   AvailableSlotsQuery,
   AvailableBySpecialtyQuery,
@@ -414,6 +415,19 @@ export class AppointmentService {
         logger.error({ err, appointmentId: appointment.id }, "Failed to enqueue notification jobs");
       }
 
+      try {
+        const mrService = new MedicalRecordService(this.prisma);
+        await mrService.createAutoEntry(
+          appointment.patientId,
+          appointment.id,
+          "auto_created",
+          `Turno creado — Dr. ${appointment.doctor.firstName} ${appointment.doctor.lastName}, ${appointment.clinic.name}, ${appointment.specialty.name}`,
+          appointment.date,
+        );
+      } catch (err) {
+        logger.error({ err, appointmentId: appointment.id }, "Failed to create auto medical record entry");
+      }
+
       return appointment;
     } catch (error) {
       if (
@@ -465,6 +479,19 @@ export class AppointmentService {
       logger.error({ err, appointmentId: id }, "Failed to enqueue confirmed notification");
     }
 
+    try {
+      const mrService = new MedicalRecordService(this.prisma);
+      await mrService.createAutoEntry(
+        updated.patientId,
+        updated.id,
+        "auto_confirmed",
+        `Turno confirmado — Dr. ${updated.doctor.firstName} ${updated.doctor.lastName}, ${updated.clinic.name}`,
+        updated.date,
+      );
+    } catch (err) {
+      logger.error({ err, appointmentId: id }, "Failed to create auto medical record entry");
+    }
+
     return updated;
   }
 
@@ -507,6 +534,19 @@ export class AppointmentService {
       });
     } catch (err) {
       logger.error({ err, appointmentId: id }, "Failed to enqueue cancelled notification");
+    }
+
+    try {
+      const mrService = new MedicalRecordService(this.prisma);
+      await mrService.createAutoEntry(
+        updated.patientId,
+        updated.id,
+        "auto_cancelled",
+        `Turno cancelado — Dr. ${updated.doctor.firstName} ${updated.doctor.lastName}, ${updated.clinic.name}`,
+        updated.date,
+      );
+    } catch (err) {
+      logger.error({ err, appointmentId: id }, "Failed to create auto medical record entry");
     }
 
     return updated;
