@@ -1,6 +1,13 @@
-import { type PrismaClient, Prisma } from "@prisma/client";
+import { type PrismaClient, Prisma, AppointmentStatus } from "@prisma/client";
+import { format } from "date-fns";
 import { ConflictError, NotFoundError } from "../../utils/errors";
 import { type PaginationQuery, paginationArgs, buildOrderBy } from "../../utils/pagination";
+import { logger } from "../../utils/logger";
+import {
+  enqueueCancelledNotification,
+  removeAppointmentJobs,
+} from "../../queue/appointment.queue";
+import { MedicalRecordService } from "../medical-record/medical-record.service";
 
 const SORTABLE_FIELDS = [
   "firstName", "lastName", "dni", "licenseNumber",
@@ -91,7 +98,64 @@ export class DoctorService {
   }
 
   async delete(id: number) {
-    await this.findById(id);
+    const doctor = await this.findById(id);
+
+    const activeAppointments = await this.prisma.appointment.findMany({
+      where: {
+        doctorId: id,
+        status: { in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED] },
+      },
+      include: {
+        patient: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+        specialty: { select: { name: true } },
+        clinic: { select: { name: true } },
+      },
+    });
+
+    const mrService = new MedicalRecordService(this.prisma);
+    const doctorName = `${doctor.firstName} ${doctor.lastName}`;
+
+    for (const appt of activeAppointments) {
+      await this.prisma.appointment.update({
+        where: { id: appt.id },
+        data: { status: AppointmentStatus.CANCELLED },
+      });
+
+      try {
+        await removeAppointmentJobs(appt.id);
+      } catch (err) {
+        logger.error({ err, appointmentId: appt.id }, "Failed to remove reminder jobs on doctor delete");
+      }
+
+      try {
+        await enqueueCancelledNotification({
+          appointmentId: appt.id,
+          patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
+          patientEmail: appt.patient.email ?? undefined,
+          patientPhone: appt.patient.phone,
+          doctorName,
+          specialtyName: appt.specialty.name,
+          clinicName: appt.clinic.name,
+          date: format(appt.date, "yyyy-MM-dd"),
+          startTime: appt.startTime ?? format(appt.date, "HH:mm"),
+        });
+      } catch (err) {
+        logger.error({ err, appointmentId: appt.id }, "Failed to enqueue cancelled notification on doctor delete");
+      }
+
+      try {
+        await mrService.createAutoEntry(
+          appt.patient.id,
+          appt.id,
+          "auto_cancelled",
+          `Turno cancelado — Doctor ${doctorName} eliminado del sistema`,
+          appt.date,
+        );
+      } catch (err) {
+        logger.error({ err, appointmentId: appt.id }, "Failed to create auto medical record on doctor delete");
+      }
+    }
+
     return this.prisma.doctor.delete({ where: { id } });
   }
 
