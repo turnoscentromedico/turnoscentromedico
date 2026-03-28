@@ -27,3 +27,18 @@ export async function requireOperatorOrAdmin(
     });
   }
 }
+
+export async function requireStaff(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const allowed: string[] = ["ADMIN", "OPERATOR", "DOCTOR"];
+  if (!request.userRole || !allowed.includes(request.userRole)) {
+    return reply.status(403).send({
+      success: false,
+      error: "FORBIDDEN",
+      message: "Staff access required",
+      statusCode: 403,
+    });
+  }
+}

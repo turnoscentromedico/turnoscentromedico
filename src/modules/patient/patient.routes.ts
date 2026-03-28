@@ -8,22 +8,9 @@ import {
 } from "./patient.schema";
 import { paginationQuerySchema } from "../../utils/pagination";
 
-export async function patientRoutes(app: FastifyInstance) {
+export async function patientReadRoutes(app: FastifyInstance) {
   const router = app.withTypeProvider<ZodTypeProvider>();
   const service = new PatientService(app.prisma);
-
-  router.post(
-    "/",
-    {
-      schema: {
-        body: createPatientSchema,
-      },
-    },
-    async (request, reply) => {
-      const patient = await service.create(request.body);
-      return reply.status(201).send({ success: true, data: patient });
-    },
-  );
 
   router.get(
     "/",
@@ -48,6 +35,24 @@ export async function patientRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const patient = await service.findById(request.params.id);
       return reply.send({ success: true, data: patient });
+    },
+  );
+}
+
+export async function patientWriteRoutes(app: FastifyInstance) {
+  const router = app.withTypeProvider<ZodTypeProvider>();
+  const service = new PatientService(app.prisma);
+
+  router.post(
+    "/",
+    {
+      schema: {
+        body: createPatientSchema,
+      },
+    },
+    async (request, reply) => {
+      const patient = await service.create(request.body);
+      return reply.status(201).send({ success: true, data: patient });
     },
   );
 

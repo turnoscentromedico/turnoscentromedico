@@ -5,13 +5,13 @@ import { type PaginationQuery, paginationArgs, buildOrderBy } from "../../utils/
 const SORTABLE_FIELDS = ["name", "email", "role", "active", "createdAt"];
 import type { CreateUserInput, UpdateUserInput } from "./user.schema";
 
-const USER_INCLUDE = { clinics: true } as const;
+const USER_INCLUDE = { clinics: true, doctor: { select: { id: true, firstName: true, lastName: true } } } as const;
 
 export class UserService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(data: CreateUserInput) {
-    const { clinicIds, ...rest } = data;
+    const { clinicIds, doctorId, ...rest } = data;
     try {
       return await this.prisma.user.create({
         data: {
@@ -19,6 +19,7 @@ export class UserService {
           clinics: clinicIds?.length
             ? { connect: clinicIds.map((id) => ({ id })) }
             : undefined,
+          doctorId: doctorId ?? null,
         },
         include: USER_INCLUDE,
       });
@@ -58,7 +59,7 @@ export class UserService {
 
   async update(id: number, data: UpdateUserInput) {
     await this.findById(id);
-    const { clinicIds, ...rest } = data;
+    const { clinicIds, doctorId, ...rest } = data;
     try {
       return await this.prisma.user.update({
         where: { id },
@@ -67,6 +68,7 @@ export class UserService {
           ...(clinicIds !== undefined && {
             clinics: { set: clinicIds.map((id) => ({ id })) },
           }),
+          ...(doctorId !== undefined && { doctorId }),
         },
         include: USER_INCLUDE,
       });

@@ -54,22 +54,9 @@ export async function appointmentPublicRoutes(app: FastifyInstance) {
   );
 }
 
-export async function appointmentProtectedRoutes(app: FastifyInstance) {
+export async function appointmentReadRoutes(app: FastifyInstance) {
   const router = app.withTypeProvider<ZodTypeProvider>();
   const service = new AppointmentService(app.prisma);
-
-  router.post(
-    "/",
-    {
-      schema: {
-        body: bookAppointmentSchema,
-      },
-    },
-    async (request, reply) => {
-      const appointment = await service.bookAppointment(request.body);
-      return reply.status(201).send({ success: true, data: appointment });
-    },
-  );
 
   router.get(
     "/",
@@ -79,7 +66,11 @@ export async function appointmentProtectedRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await service.findAll(request.query);
+      const query = { ...request.query } as Record<string, unknown>;
+      if (request.userRole === "DOCTOR" && request.doctorId) {
+        query.doctorId = request.doctorId;
+      }
+      const result = await service.findAll(query as typeof request.query);
       return reply.send({ success: true, ...result });
     },
   );
@@ -133,6 +124,24 @@ export async function appointmentProtectedRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const appointment = await service.resendConfirmation(request.params.id);
       return reply.send({ success: true, data: appointment });
+    },
+  );
+}
+
+export async function appointmentWriteRoutes(app: FastifyInstance) {
+  const router = app.withTypeProvider<ZodTypeProvider>();
+  const service = new AppointmentService(app.prisma);
+
+  router.post(
+    "/",
+    {
+      schema: {
+        body: bookAppointmentSchema,
+      },
+    },
+    async (request, reply) => {
+      const appointment = await service.bookAppointment(request.body);
+      return reply.status(201).send({ success: true, data: appointment });
     },
   );
 }

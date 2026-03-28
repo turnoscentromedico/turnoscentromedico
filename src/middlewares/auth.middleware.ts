@@ -10,6 +10,7 @@ declare module "fastify" {
     userRole?: UserRole;
     systemUserId?: number;
     userClinicIds?: number[];
+    doctorId?: number | null;
   }
 }
 
@@ -53,11 +54,12 @@ async function autoProvisionUser(
 
 function setUserOnRequest(
   request: FastifyRequest,
-  user: { id: number; role: UserRole; clinics?: { id: number }[] },
+  user: { id: number; role: UserRole; doctorId?: number | null; clinics?: { id: number }[] },
 ) {
   request.userRole = user.role;
   request.systemUserId = user.id;
   request.userClinicIds = user.clinics?.map((c) => c.id) ?? [];
+  request.doctorId = user.doctorId ?? null;
 }
 
 export async function verifyAuth(

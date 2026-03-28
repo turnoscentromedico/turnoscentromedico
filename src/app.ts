@@ -10,7 +10,7 @@ import { errorHandler } from "./utils/errors";
 import prismaPlugin from "./plugins/prisma";
 import bullBoardPlugin from "./plugins/bull-board";
 import { verifyAuth } from "./middlewares/auth.middleware";
-import { requireAdmin, requireOperatorOrAdmin } from "./middlewares/role.middleware";
+import { requireAdmin, requireOperatorOrAdmin, requireStaff } from "./middlewares/role.middleware";
 import {
   clinicPublicRoutes,
   clinicAdminRoutes,
@@ -23,10 +23,11 @@ import {
   doctorPublicRoutes,
   doctorProtectedRoutes,
 } from "./modules/doctor/doctor.routes";
-import { patientRoutes } from "./modules/patient/patient.routes";
+import { patientReadRoutes, patientWriteRoutes } from "./modules/patient/patient.routes";
 import {
   appointmentPublicRoutes,
-  appointmentProtectedRoutes,
+  appointmentReadRoutes,
+  appointmentWriteRoutes,
 } from "./modules/appointment/appointment.routes";
 import { userRoutes } from "./modules/user/user.routes";
 import { scheduleRoutes } from "./modules/schedule/schedule.routes";
@@ -127,27 +128,25 @@ export async function buildApp() {
           systemUserId: request.systemUserId,
           role: request.userRole,
           clinicIds: request.userClinicIds ?? [],
+          doctorId: request.doctorId ?? null,
         },
       });
     });
 
-    // ── Operator + Admin routes ───────────────────────────
-    await scope.register(async function operatorScope(opScope) {
-      opScope.addHook("preHandler", requireOperatorOrAdmin);
+    // ── Staff routes (ADMIN + OPERATOR + DOCTOR) ──────────
+    await scope.register(async function staffScope(stScope) {
+      stScope.addHook("preHandler", requireStaff);
 
-      await opScope.register(patientRoutes, { prefix: "/api/patients" });
-      await opScope.register(appointmentProtectedRoutes, {
-        prefix: "/api/appointments",
-      });
-      await opScope.register(specialtyAdminRoutes, { prefix: "/api/specialties" });
-      await opScope.register(doctorProtectedRoutes, { prefix: "/api/doctors" });
-      await opScope.register(scheduleRoutes, { prefix: "/api/schedules" });
-      await opScope.register(unavailabilityRoutes, { prefix: "/api/unavailabilities" });
-      await opScope.register(notificationRoutes, { prefix: "/api/notifications" });
-      await opScope.register(medicalRecordRoutes, { prefix: "/api" });
+      await stScope.register(appointmentReadRoutes, { prefix: "/api/appointments" });
+      await stScope.register(patientReadRoutes, { prefix: "/api/patients" });
+      await stScope.register(medicalRecordRoutes, { prefix: "/api" });
 
       // GET /api/dashboard/stats
-      opScope.get("/api/dashboard/stats", async () => {
+      stScope.get("/api/dashboard/stats", async (request) => {
+        const doctorFilter = request.userRole === "DOCTOR" && request.doctorId
+          ? { doctorId: request.doctorId }
+          : {};
+
         const [clinics, doctors, patients, specialties, users, appointments] =
           await Promise.all([
             app.prisma.clinic.count(),
@@ -157,6 +156,7 @@ export async function buildApp() {
             app.prisma.user.count({ where: { active: true } }),
             app.prisma.appointment.groupBy({
               by: ["status"],
+              where: doctorFilter,
               _count: true,
             }),
           ]);
@@ -180,6 +180,19 @@ export async function buildApp() {
           },
         };
       });
+    });
+
+    // ── Operator + Admin routes ───────────────────────────
+    await scope.register(async function operatorScope(opScope) {
+      opScope.addHook("preHandler", requireOperatorOrAdmin);
+
+      await opScope.register(patientWriteRoutes, { prefix: "/api/patients" });
+      await opScope.register(appointmentWriteRoutes, { prefix: "/api/appointments" });
+      await opScope.register(specialtyAdminRoutes, { prefix: "/api/specialties" });
+      await opScope.register(doctorProtectedRoutes, { prefix: "/api/doctors" });
+      await opScope.register(scheduleRoutes, { prefix: "/api/schedules" });
+      await opScope.register(unavailabilityRoutes, { prefix: "/api/unavailabilities" });
+      await opScope.register(notificationRoutes, { prefix: "/api/notifications" });
     });
 
     // ── Admin-only routes ─────────────────────────────────
