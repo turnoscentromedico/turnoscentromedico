@@ -10,6 +10,7 @@ datasource db {
 enum UserRole {
   ADMIN
   OPERATOR
+  DOCTOR
   STANDARD
 }
 
@@ -22,6 +23,8 @@ model User {
   clinics     Clinic[]         @relation("UserClinics")
   active      Boolean          @default(true)
   preferences UserPreference?
+  doctorId    Int?             @unique
+  doctor      Doctor?          @relation(fields: [doctorId], references: [id])
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -78,6 +81,7 @@ model Doctor {
   schedule         DoctorSchedule[]
   unavailabilities DoctorUnavailability[]
   appointments     Appointment[]
+  user             User?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
