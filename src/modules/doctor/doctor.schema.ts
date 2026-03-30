@@ -10,7 +10,7 @@ export const createDoctorSchema = z.object({
   phone: z.string().max(50).nullish(),
   address: z.string().max(500).nullish(),
   licenseNumber: z.string().min(1).max(50),
-  specialtyId: z.number().int().positive(),
+  specialtyIds: z.array(z.number().int().positive()).min(1, "At least one specialty is required"),
   clinicId: z.number().int().positive(),
 });
 
@@ -23,7 +23,7 @@ export const updateDoctorSchema = z.object({
   phone: z.string().max(50).nullish(),
   address: z.string().max(500).nullish(),
   licenseNumber: z.string().min(1).max(50).optional(),
-  specialtyId: z.number().int().positive().optional(),
+  specialtyIds: z.array(z.number().int().positive()).min(1).optional(),
   clinicId: z.number().int().positive().optional(),
 });
 

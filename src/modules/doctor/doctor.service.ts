@@ -11,7 +11,7 @@ import { MedicalRecordService } from "../medical-record/medical-record.service";
 
 const SORTABLE_FIELDS = [
   "firstName", "lastName", "dni", "licenseNumber",
-  "specialty.name", "clinic.name", "createdAt",
+  "clinic.name", "createdAt",
 ];
 import type {
   CreateDoctorInput,
@@ -19,16 +19,20 @@ import type {
   DoctorQuery,
 } from "./doctor.schema";
 
-const DOCTOR_INCLUDE = { specialty: true, clinic: true } as const;
+const DOCTOR_INCLUDE = { specialties: true, clinic: true } as const;
 
 export class DoctorService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create(data: CreateDoctorInput) {
-    await this.validateRelations(data.specialtyId, data.clinicId);
+    const { specialtyIds, ...rest } = data;
+    await this.validateRelations(specialtyIds, rest.clinicId);
     try {
       return await this.prisma.doctor.create({
-        data,
+        data: {
+          ...rest,
+          specialties: { connect: specialtyIds.map((id) => ({ id })) },
+        },
         include: DOCTOR_INCLUDE,
       });
     } catch (error) {
@@ -45,7 +49,7 @@ export class DoctorService {
 
   async findAll(query: DoctorQuery & PaginationQuery) {
     const where: Record<string, unknown> = {};
-    if (query.specialtyId) where.specialtyId = query.specialtyId;
+    if (query.specialtyId) where.specialties = { some: { id: query.specialtyId } };
     if (query.clinicId) where.clinicId = query.clinicId;
 
     const orderBy = buildOrderBy(query, SORTABLE_FIELDS, { lastName: "asc" });
@@ -76,13 +80,19 @@ export class DoctorService {
 
   async update(id: number, data: UpdateDoctorInput) {
     await this.findById(id);
-    if (data.specialtyId || data.clinicId) {
-      await this.validateRelations(data.specialtyId, data.clinicId);
+    const { specialtyIds, ...rest } = data;
+    if (specialtyIds || rest.clinicId) {
+      await this.validateRelations(specialtyIds, rest.clinicId);
     }
     try {
       return await this.prisma.doctor.update({
         where: { id },
-        data,
+        data: {
+          ...rest,
+          ...(specialtyIds && {
+            specialties: { set: specialtyIds.map((sid) => ({ id: sid })) },
+          }),
+        },
         include: DOCTOR_INCLUDE,
       });
     } catch (error) {
@@ -159,12 +169,14 @@ export class DoctorService {
     return this.prisma.doctor.delete({ where: { id } });
   }
 
-  private async validateRelations(specialtyId?: number, clinicId?: number) {
-    if (specialtyId) {
-      const specialty = await this.prisma.specialty.findUnique({
-        where: { id: specialtyId },
+  private async validateRelations(specialtyIds?: number[], clinicId?: number) {
+    if (specialtyIds?.length) {
+      const count = await this.prisma.specialty.count({
+        where: { id: { in: specialtyIds } },
       });
-      if (!specialty) throw new NotFoundError("Specialty", specialtyId);
+      if (count !== specialtyIds.length) {
+        throw new NotFoundError("Specialty", specialtyIds.join(", "));
+      }
     }
     if (clinicId) {
       const clinic = await this.prisma.clinic.findUnique({

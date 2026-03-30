@@ -24,6 +24,7 @@ export const availableBySpecialtyQuerySchema = z.object({
 export const bookAppointmentSchema = z.object({
   clinicId: z.number().int().positive(),
   doctorId: z.number().int().positive(),
+  specialtyId: z.number().int().positive(),
   patientId: z.number().int().positive(),
   date: dateString,
   startTime: timeString,

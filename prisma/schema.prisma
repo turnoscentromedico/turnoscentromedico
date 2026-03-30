@@ -74,9 +74,8 @@ model Doctor {
   phone            String?
   address          String?
   licenseNumber    String                 @unique
-  specialtyId      Int
   clinicId         Int
-  specialty        Specialty              @relation(fields: [specialtyId], references: [id])
+  specialties      Specialty[]
   clinic           Clinic                 @relation(fields: [clinicId], references: [id])
   schedule         DoctorSchedule[]
   unavailabilities DoctorUnavailability[]
@@ -155,7 +154,7 @@ model Appointment {
   specialty    Specialty              @relation(fields: [specialtyId], references: [id])
   clinic       Clinic                 @relation(fields: [clinicId], references: [id])
   actionTokens  AppointmentActionToken[]
-  medicalRecord MedicalRecord?
+  medicalRecords MedicalRecord[]
 
   @@unique([doctorId, date, startTime])
   @@map("appointments")
@@ -210,7 +209,7 @@ model MedicalRecord {
   id            Int          @id @default(autoincrement())
   patientId     Int
   patient       Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  appointmentId Int?         @unique
+  appointmentId Int?
   appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   entryType     String
