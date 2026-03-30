@@ -109,7 +109,7 @@ function isValidSlotTime(
 }
 
 const APPOINTMENT_INCLUDE = {
-  doctor: true,
+  doctor: { include: { specialties: true } },
   patient: true,
   clinic: true,
   specialty: true,
@@ -142,7 +142,7 @@ export class AppointmentService {
       clinicId: params.clinicId,
     };
     if (params.doctorId) doctorWhere.id = params.doctorId;
-    if (params.specialtyId) doctorWhere.specialtyId = params.specialtyId;
+    if (params.specialtyId) doctorWhere.specialties = { some: { id: params.specialtyId } };
 
     const daysOfWeek = [...new Set(days.map((d) => getDay(d)))];
 
@@ -150,7 +150,7 @@ export class AppointmentService {
       this.prisma.doctor.findMany({
         where: doctorWhere,
         include: {
-          specialty: true,
+          specialties: true,
           schedule: { where: { dayOfWeek: { in: daysOfWeek }, active: true } },
         },
       }),
@@ -159,7 +159,7 @@ export class AppointmentService {
           clinicId: params.clinicId,
           ...(params.doctorId ? { doctorId: params.doctorId } : {}),
           ...(params.specialtyId
-            ? { doctor: { specialtyId: params.specialtyId } }
+            ? { doctor: { specialties: { some: { id: params.specialtyId } } } }
             : {}),
           date: { gte: startOfDay(rangeStart), lte: endOfDay(rangeEnd) },
           status: { not: AppointmentStatus.CANCELLED },
@@ -170,7 +170,7 @@ export class AppointmentService {
           ...(params.doctorId
             ? { doctorId: params.doctorId }
             : params.specialtyId
-              ? { doctor: { specialtyId: params.specialtyId, clinicId: params.clinicId } }
+              ? { doctor: { specialties: { some: { id: params.specialtyId } }, clinicId: params.clinicId } }
               : {}),
           date: { gte: startOfDay(rangeStart), lte: endOfDay(rangeEnd) },
         },
@@ -218,6 +218,7 @@ export class AppointmentService {
       return false;
     }
 
+    const filterSpecialtyId = params.specialtyId;
     const slots: AvailableSlot[] = [];
 
     for (const day of days) {
@@ -227,6 +228,12 @@ export class AppointmentService {
       for (const doctor of doctors) {
         const schedules =
           scheduleByDoctorDay.get(`${doctor.id}-${dayOfWeek}`) ?? [];
+
+        const slotSpecialty = filterSpecialtyId
+          ? doctor.specialties.find((s) => s.id === filterSpecialtyId)
+          : doctor.specialties[0];
+
+        if (!slotSpecialty) continue;
 
         for (const schedule of schedules) {
           const timeSlots = generateTimeSlots(
@@ -244,8 +251,8 @@ export class AppointmentService {
               slots.push({
                 doctorId: doctor.id,
                 doctorName: `${doctor.firstName} ${doctor.lastName}`,
-                specialtyId: doctor.specialtyId,
-                specialtyName: doctor.specialty.name,
+                specialtyId: slotSpecialty.id,
+                specialtyName: slotSpecialty.name,
                 date: dateStr,
                 startTime: start,
                 endTime: end,
@@ -262,6 +269,7 @@ export class AppointmentService {
   async bookAppointment(data: BookAppointmentInput) {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id: data.doctorId },
+      include: { specialties: true },
     });
     if (!doctor) throw new NotFoundError("Doctor", data.doctorId);
     if (doctor.clinicId !== data.clinicId) {
@@ -269,6 +277,15 @@ export class AppointmentService {
         400,
         "Doctor does not belong to this clinic",
         "DOCTOR_CLINIC_MISMATCH",
+      );
+    }
+
+    const hasSpecialty = doctor.specialties.some((s) => s.id === data.specialtyId);
+    if (!hasSpecialty) {
+      throw new AppError(
+        400,
+        "El doctor no tiene asignada esta especialidad",
+        "DOCTOR_SPECIALTY_MISMATCH",
       );
     }
 
@@ -384,7 +401,7 @@ export class AppointmentService {
             clinicId: data.clinicId,
             doctorId: data.doctorId,
             patientId: data.patientId,
-            specialtyId: doctor.specialtyId,
+            specialtyId: data.specialtyId,
             date: appointmentDateTime,
             startTime: data.startTime,
             endTime: endTimeStr,
@@ -630,12 +647,12 @@ export class AppointmentService {
       clinicId: params.clinicId,
     };
     if (params.doctorId) doctorWhere.id = params.doctorId;
-    if (params.specialtyId) doctorWhere.specialtyId = params.specialtyId;
+    if (params.specialtyId) doctorWhere.specialties = { some: { id: params.specialtyId } };
 
     const doctors = await this.prisma.doctor.findMany({
       where: doctorWhere,
       include: {
-        specialty: true,
+        specialties: true,
         schedule: { where: { dayOfWeek, active: true } },
       },
     });
@@ -696,9 +713,16 @@ export class AppointmentService {
       return false;
     }
 
+    const filterSpecialtyId = params.specialtyId;
     const slots: AvailableSlot[] = [];
 
     for (const doctor of doctors) {
+      const slotSpecialty = filterSpecialtyId
+        ? doctor.specialties.find((s) => s.id === filterSpecialtyId)
+        : doctor.specialties[0];
+
+      if (!slotSpecialty) continue;
+
       for (const schedule of doctor.schedule) {
         const timeSlots = generateTimeSlots(
           schedule.startTime,
@@ -715,8 +739,8 @@ export class AppointmentService {
             slots.push({
               doctorId: doctor.id,
               doctorName: `${doctor.firstName} ${doctor.lastName}`,
-              specialtyId: doctor.specialtyId,
-              specialtyName: doctor.specialty.name,
+              specialtyId: slotSpecialty.id,
+              specialtyName: slotSpecialty.name,
               date: params.date,
               startTime: start,
               endTime: end,
